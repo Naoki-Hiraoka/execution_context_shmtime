@@ -51,6 +51,7 @@ int ShmTimePeriodicExecutionContext::svc(void)
         }
       m_worker.mutex_.unlock();
       coil::TimeValue t1(c_shm->tv_sec,c_shm->tv_usec);
+      if((double)(t1 - t0) < 0) t0 = t1; //巻き戻り
 
       if ((double)(t1 - t0) > m_period){
         std::cerr<<"[ShmTimeEC] Timeover: processing time = "<<(double)(t1 - t0)<<"[s]"<<std::endl;
@@ -62,11 +63,11 @@ int ShmTimePeriodicExecutionContext::svc(void)
       }
 
       // ROS::Timeは/clockが届いたときにしか変化しない. /clockの周期と制御周期が近い場合、単純なcoil::sleep(m_period - (t1 - t0))では誤差が大きい
-      // ros::Rate::sleepは内部で1ms間隔でsleepするため、粗すぎる
       while (!m_nowait && m_period > (t1 - t0))
         {
           coil::sleep((coil::TimeValue)(double(m_period) / 100));
           t1 = coil::TimeValue(c_shm->tv_sec,c_shm->tv_usec);
+          if((double)(t1 - t0) < 0) t0 = t1; //巻き戻り
         }
 
       ++count;

@@ -29,7 +29,7 @@ int ShmTimePeriodicExecutionContext::svc(void)
     exit(1);
   }
 
-
+  coil::TimeValue prev_t(c_shm->tv_sec,c_shm->tv_usec);
   do
     {
       m_worker.mutex_.lock();
@@ -37,7 +37,6 @@ int ShmTimePeriodicExecutionContext::svc(void)
         {
           m_worker.cond_.wait();
         }
-      coil::TimeValue t0(c_shm->tv_sec,c_shm->tv_usec);
 
       std::vector<double> processTimes(m_comps.size());
       if (m_worker.running_)
@@ -50,11 +49,11 @@ int ShmTimePeriodicExecutionContext::svc(void)
           }
         }
       m_worker.mutex_.unlock();
-      coil::TimeValue t1(c_shm->tv_sec,c_shm->tv_usec);
-      if((double)(t1 - t0) < 0) t0 = t1; //巻き戻り
+      coil::TimeValue cur_t(c_shm->tv_sec,c_shm->tv_usec);
+      if((double)(cur_t - prev_t) < 0) prev_t = cur_t; //巻き戻り
 
-      if ((double)(t1 - t0) > m_period){
-        std::cerr<<"[ShmTimeEC] Timeover: processing time = "<<(double)(t1 - t0)<<"[s]"<<std::endl;
+      if ((double)(cur_t - prev_t) > m_period){
+        std::cerr<<"[ShmTimeEC] Timeover: processing time = "<<(double)(cur_t - prev_t)<<"[s]"<<std::endl;
         for(int i=0;i<m_comps.size();i++){
           RTC::ComponentProfile_var profile = RTC::RTObject::_narrow(m_comps[i]._ref)->get_component_profile(); // get_component_profile() はポインタを返すので、呼び出し側で release するか、_var型変数で受ける必要がある
           std::cerr << profile->instance_name<<"("<<processTimes[i]<<"), ";
@@ -63,13 +62,14 @@ int ShmTimePeriodicExecutionContext::svc(void)
       }
 
       // ROS::Timeは/clockが届いたときにしか変化しない. /clockの周期と制御周期が近い場合、単純なcoil::sleep(m_period - (t1 - t0))では誤差が大きい
-      while (!m_nowait && m_period > (t1 - t0))
+      while (!m_nowait && m_period > (cur_t - prev_t))
         {
           coil::sleep((coil::TimeValue)(double(m_period) / 100));
-          t1 = coil::TimeValue(c_shm->tv_sec,c_shm->tv_usec);
-          if((double)(t1 - t0) < 0) t0 = t1; //巻き戻り
+          cur_t = coil::TimeValue(c_shm->tv_sec,c_shm->tv_usec);
+          if((double)(cur_t - prev_t) < 0) prev_t = cur_t; //巻き戻り
         }
 
+      while (prev_t < cur_t) prev_t = prev_t + m_period;
       ++count;
     } while (m_svc);
 

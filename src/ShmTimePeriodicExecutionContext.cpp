@@ -30,6 +30,7 @@ int ShmTimePeriodicExecutionContext::svc(void)
   }
 
   coil::TimeValue prev_t(c_shm->tv_sec,c_shm->tv_usec);
+  std::vector<std::string> rtc_names;
   do
     {
       m_worker.mutex_.lock();
@@ -53,10 +54,17 @@ int ShmTimePeriodicExecutionContext::svc(void)
       if((double)(cur_t - prev_t) < 0) prev_t = cur_t; //巻き戻り
 
       if ((double)(cur_t - prev_t) > m_period){
+        if( m_comps.size() != rtc_names.size() ) {
+          rtc_names.resize(m_comps.size());
+          for(int i=0;i<m_comps.size();i++){
+            RTC::ComponentProfile_var profile = RTC::RTObject::_narrow(m_comps[i]._ref)->get_component_profile(); // get_component_profile() はポインタを返すので、呼び出し側で release するか、_var型変数で受ける必要がある. get_component_profile() は時間がかかるので、毎周期呼んではいけない
+            rtc_names[i] = profile->instance_name;
+          }
+        }
+
         std::cerr<<"[ShmTimeEC] Timeover: processing time = "<<(double)(cur_t - prev_t)<<"[s]"<<std::endl;
         for(int i=0;i<m_comps.size();i++){
-          RTC::ComponentProfile_var profile = RTC::RTObject::_narrow(m_comps[i]._ref)->get_component_profile(); // get_component_profile() はポインタを返すので、呼び出し側で release するか、_var型変数で受ける必要がある
-          std::cerr << profile->instance_name<<"("<<processTimes[i]<<"), ";
+          std::cerr << rtc_names[i] <<"("<<processTimes[i]<<"), ";
         }
         std::cerr << std::endl;
       }

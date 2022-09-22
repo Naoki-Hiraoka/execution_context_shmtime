@@ -18,7 +18,15 @@ int ShmTimePeriodicExecutionContext::svc(void)
 
   struct timeval * c_shm;
 
-  int shm_id = shmget(969, sizeof(struct timeval), 0666|IPC_CREAT);
+  int shm_key;
+  if(std::getenv("CLOCK_SHM_KEY")){
+    shm_key=atoi(std::getenv("CLOCK_SHM_KEY"));
+  }else{
+    shm_key=969;
+  }
+  std::cerr << "[ShmTimePeriodicExecutionContext] shmget " << shm_key << std::endl;
+
+  int shm_id = shmget(shm_key, sizeof(struct timeval), 0666|IPC_CREAT);
   if(shm_id == -1) {
     std::cerr << "\e[0;31m" << "[ClockShmItem] shmget failed"  << "\e[0m" << std::endl;
     exit(1);

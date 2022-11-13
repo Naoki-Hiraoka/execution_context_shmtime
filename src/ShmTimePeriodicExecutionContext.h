@@ -13,6 +13,7 @@ public:
     ShmTimePeriodicExecutionContext();
     virtual ~ShmTimePeriodicExecutionContext(void);
     virtual int svc(void);
+    virtual RTC::ReturnCode_t deactivate_component(RTC::LightweightRTObject_ptr comp) throw (CORBA::SystemException);
 };
 
 extern "C"

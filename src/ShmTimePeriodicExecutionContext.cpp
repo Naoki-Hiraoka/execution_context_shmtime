@@ -92,6 +92,25 @@ int ShmTimePeriodicExecutionContext::svc(void)
   return 0;
 }
 
+/*
+  https://github.com/choreonoid/choreonoid/blob/release-1.7/src/OpenRTMPlugin/SimulationPeriodicExecutionContext.cpp を参考にした
+  PeriodicExecutionContextは、Ctrl-Cしてから終了するまでに時間がかかる. これは、全てのRTCがINACTIVEになるまで待ってから終了する処理が走っているからで、Ctrl-Cしてゾンビ状態になっているRTCからのレスポンスを待ち続けるような状態になっているらしい. 待つ処理を削除した.
+ */
+RTC::ReturnCode_t ShmTimePeriodicExecutionContext::deactivate_component(RTC::LightweightRTObject_ptr comp)
+throw (CORBA::SystemException)
+{
+    RTC_TRACE(("deactivate_component()"));
+    
+    CompItr it = std::find_if(m_comps.begin(), m_comps.end(), find_comp(comp));
+    if(it == m_comps.end()) { return RTC::BAD_PARAMETER; }
+    if(!(it->_sm.m_sm.isIn(RTC::ACTIVE_STATE))){
+        return RTC::PRECONDITION_NOT_MET;
+    }
+    it->_sm.m_sm.goTo(RTC::INACTIVE_STATE);
+    
+    return RTC::RTC_OK;
+}
+
 extern "C"
 {
     void ShmTimePeriodicExecutionContextInit(RTC::Manager* manager)

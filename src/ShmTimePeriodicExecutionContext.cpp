@@ -41,11 +41,7 @@ int ShmTimePeriodicExecutionContext::svc(void)
   std::vector<std::string> rtc_names;
   do
     {
-      m_worker.mutex_.lock();
-      while (!m_worker.running_)
-        {
-          m_worker.cond_.wait();
-        }
+      // PeriodicExecutionContextではm_worker.running_のチェックを行い、trueになるまでwaitする機能が入っていた. hrpECでは、入っていなかった. この機能があると、複数RTCを一つのECで回している場合に、ctrl-Cで終了するときになぜかwaitから戻ってこないことがあったため、入れないことにした. m_worker.running_と、m_runningは、stop()のときに同時にfalseになるので、ほとんど影響はない?
 
       std::vector<double> processTimes(m_comps.size());
       if (m_worker.running_)
@@ -57,7 +53,7 @@ int ShmTimePeriodicExecutionContext::svc(void)
             processTimes[i] = double(after - before);
           }
         }
-      m_worker.mutex_.unlock();
+
       coil::TimeValue cur_t(c_shm->tv_sec,c_shm->tv_usec);
       if((double)(cur_t - prev_t) < 0) prev_t = cur_t; //巻き戻り
 
@@ -87,7 +83,7 @@ int ShmTimePeriodicExecutionContext::svc(void)
 
       while (prev_t < cur_t) prev_t = prev_t + m_period;
       ++count;
-    } while (m_svc);
+    } while (m_running); // m_svcはデストラクタでfalseになる. m_runningはstop()でfalseになる. PeriodicExecutionContextではm_svcを見て、hrpECはm_runningを見ている. hrpECに合わせてm_runningにした
 
   return 0;
 }
